@@ -1,0 +1,16 @@
+<launch>
+    <!-- Launch OAK-D Spectaular AI wrapper node -->
+    <node pkg="spectacular_ai_wrapper"
+          type="oakd_spectacularai_node.py"
+          name="oakd_spectacularai_node"
+          output="screen">
+    </node>
+
+    <!-- Launch Rviz config for this package -->
+    <node pkg="rviz"
+          type="rviz"
+          name="rviz"
+          args="-d $(find spectacular_ai_wrapper)/config/oakd.rviz"
+          output="screen">
+    </node>
+</launch>
