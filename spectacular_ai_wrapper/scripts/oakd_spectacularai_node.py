@@ -18,6 +18,7 @@ class OAKDPublisherNode:
     def __init__(self):
         # ROS Node Variables
         rospy.init_node("oakd_publisher_node", anonymous=True)
+        rospy.loginfo("ROS Node Initialized")
         self.odometry_publisher = rospy.Publisher("/oakd/odometry", PoseStamped, queue_size=10)
         self.keyframe_publisher = rospy.Publisher("/oakd/keyframe", PoseStamped, queue_size=10)
         self.rgb_publisher = rospy.Publisher("/oakd/rgb", Image, queue_size=10)
@@ -184,16 +185,17 @@ class OAKDPublisherNode:
             if not self._has_keyframe(frame_id):
                 self._keyframe_publishers(frame_id, key_frame)
         if output.finalMap:
-            print("Final map ready!")
+            rospy.loginfo("Final map ready!")
 
     ########
     # MAIN #
     ########
     def run(self):
-        print("Starting OAK-D device")
+        rospy.loginfo("Starting OAK-D device")
         self.start_device()
         with self.device as device, self.vioPipeline.startSession(device) as vio_session:
             camera_info_msg = self.get_camera_info_msg(device)
+            rospy.loginfo("OAK-D device started")
             while not rospy.is_shutdown():
                 self._vio_callback(vio_session.waitForOutput())
                 self._publish_rgb(device)
