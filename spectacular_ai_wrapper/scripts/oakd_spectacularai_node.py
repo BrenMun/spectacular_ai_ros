@@ -92,8 +92,8 @@ class OAKDPublisherNode:
         tf_message = to_tf_message(camToWorld, timestamp, self.rgb_frame_id, self.world_frame_id)
         self.tf_publisher.publish(tf_message)         
     
-    def _publish_depth(self, depth_frame, timestamp, sequence_number):
-        depth_msg = self.bridge.cv2_to_imgmsg(depth_frame, encoding=self.depth_encoding)
+    def _publish_depth(self, depth_image, timestamp, sequence_number):
+        depth_msg = self.bridge.cv2_to_imgmsg(depth_image, encoding=self.depth_encoding)
         depth_msg.header.stamp = timestamp
         depth_msg.header.frame_id = self.rgb_encoding
         depth_msg.header.seq = sequence_number
@@ -145,8 +145,12 @@ class OAKDPublisherNode:
         timestamp = rospy.Time.now()
         sequence_number = int(frame_id)
         camToWorld = keyframe.frameSet.rgbFrame.cameraPose.getCameraToWorldMatrix()
+        depth_frame = keyframe.frameSet.getAlignedDepthFrame(keyframe.frameSet.rgbFrame)
+        depth_image = depth_frame.image.toArray()
+        
         # Publishers
         self._publish_keyframe(camToWorld, timestamp, sequence_number)
+        self._publish_depth(depth_image, timestamp, sequence_number)
         self._publish_point_cloud(keyframe, camToWorld, timestamp)
         
     ###########
