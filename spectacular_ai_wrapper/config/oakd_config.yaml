@@ -1,0 +1,28 @@
+rostopic:
+  odometry: "/oakd/odometry"
+  keyframe: "/oakd/keyframe"
+  rgb: "/oakd/rgb"
+  tf: "/tf"
+  pointcloud: "/oakd/pointcloud"
+  depth: "/oakd/depth"
+  camera_info: "/oakd/camera_info"
+
+frame:
+  rgb: "rgb_optical"
+  world: "world"
+
+encoding:
+  rgb: "rgb8"
+  depth: "mono16"
+
+config_internal_params: {
+  "computeStereoPointCloud": "true",
+  "pointCloudNormalsEnabled": "true",
+  "computeDenseStereoDepth": "true",    
+}
+
+rgb_queue: "rgb"
+
+image:
+  width: 1280
+  height: 720

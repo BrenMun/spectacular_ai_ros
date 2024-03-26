@@ -8,6 +8,8 @@ import numpy as np
 import time
 import os
 import tf
+import yaml
+import rospkg
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from tf2_msgs.msg import TFMessage
 from cv_bridge import CvBridge
@@ -19,18 +21,27 @@ class OAKDPublisherNode:
         # ROS Node Variables
         rospy.init_node("oakd_publisher_node", anonymous=True)
         rospy.loginfo("ROS Node Initialized")
-        self.odometry_publisher = rospy.Publisher("/oakd/odometry", PoseStamped, queue_size=10)
-        self.keyframe_publisher = rospy.Publisher("/oakd/keyframe", PoseStamped, queue_size=10)
-        self.rgb_publisher = rospy.Publisher("/oakd/rgb", Image, queue_size=10)
-        self.tf_publisher = rospy.Publisher("/tf", TFMessage, queue_size=10)
-        self.point_publisher = rospy.Publisher("/oakd/pointcloud", PointCloud2, queue_size=10)
-        self.depth_publisher = rospy.Publisher("/oakd/depth", Image, queue_size=10)
-        self.camera_info_publisher = rospy.Publisher("/oakd/camera_info", CameraInfo, queue_size=10)
+
+        # Load YAML Configuration
+        rospack = rospkg.RosPack()
+        package_path = rospack.get_path('spectacular_ai_wrapper')
+        config_path = os.path.join(package_path, 'config', 'oakd_config.yaml')
+        with open(config_path, 'r') as yaml_file:
+            config = yaml.safe_load(yaml_file)
+
+        # ROS Topics
+        self.odometry_publisher = rospy.Publisher(config['rostopic']['odometry'], PoseStamped, queue_size=10)
+        self.keyframe_publisher = rospy.Publisher(config['rostopic']['keyframe'], PoseStamped, queue_size=10)
+        self.rgb_publisher = rospy.Publisher(config['rostopic']['rgb'], Image, queue_size=10)
+        self.tf_publisher = rospy.Publisher(config['rostopic']['tf'], TFMessage, queue_size=10)
+        self.point_publisher = rospy.Publisher(config['rostopic']['pointcloud'], PointCloud2, queue_size=10)
+        self.depth_publisher = rospy.Publisher(config['rostopic']['depth'], Image, queue_size=10)
+        self.camera_info_publisher = rospy.Publisher(config['rostopic']['camera_info'], CameraInfo, queue_size=10)
         self.bridge = CvBridge()
-        self.rgb_frame_id = "rgb_optical"
-        self.rgb_encoding = "rgb8"
-        self.depth_encoding = "mono16"
-        self.world_frame_id = "world"
+        self.rgb_frame_id = config['frame']['rgb']
+        self.world_frame_id = config['frame']['world']
+        self.rgb_encoding = config['encoding']['rgb']
+        self.depth_encoding = config['encoding']['depth']
 
         # OAK-D Pipeline Variables
         self.pipeline = dai.Pipeline()
@@ -38,17 +49,13 @@ class OAKDPublisherNode:
         self.calibration_data = None
         self.keyframes = {}
         self.rgb_queue = None
-        self.rgb_queue_name = "rgb"
+        self.rgb_queue_name = config['rgb_queue']
         self._add_rgb_camera()
-        self.config_internal_params = {
-            "computeStereoPointCloud": "true",
-            "pointCloudNormalsEnabled": "true",
-            "computeDenseStereoDepth": "true",    
-        }
+        self.config_internal_params = config['config_internal_params']
         self.config = self._create_vio_pipeline_config()
         self.vioPipeline = self._configure_vio_pipeline()
-        self.image_width = 1280
-        self.image_height = 720
+        self.image_width = config['image']['width']
+        self.image_height = config['image']['height']
 
     ################
     # INIT METHODS #
