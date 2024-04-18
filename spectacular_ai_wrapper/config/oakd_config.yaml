@@ -9,7 +9,7 @@ rostopic:
 
 frame:
   rgb: "rgb_optical"
-  world: "world"
+  world: "map"
 
 encoding:
   rgb: "rgb8"
