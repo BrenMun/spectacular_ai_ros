@@ -10,11 +10,12 @@ import os
 import tf
 import yaml
 import rospkg
-from geometry_msgs.msg import PoseStamped, TransformStamped
+from geometry_msgs.msg import PoseStamped, TransformStamped, Vector3, Quaternion
 from tf2_msgs.msg import TFMessage
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2, PointField
 from spectacular_ai_wrapper.message_converter import to_pose_message, to_tf_message
+from scipy.spatial.transform import Rotation
 
 class OAKDPublisherNode:
     def __init__(self):
@@ -31,7 +32,7 @@ class OAKDPublisherNode:
 
         # ROS Topics
         self.odometry_publisher = rospy.Publisher(config['rostopic']['odometry'], PoseStamped, queue_size=10)
-        self.keyframe_publisher = rospy.Publisher(config['rostopic']['keyframe'], PoseStamped, queue_size=10)
+        self.keyframe_publisher = rospy.Publisher(config['rostopic']['keyframe'], TransformStamped, queue_size=10)
         self.rgb_publisher = rospy.Publisher(config['rostopic']['rgb'], Image, queue_size=10)
         self.tf_publisher = rospy.Publisher(config['rostopic']['tf'], TFMessage, queue_size=10)
         self.point_publisher = rospy.Publisher(config['rostopic']['pointcloud'], PointCloud2, queue_size=10)
@@ -97,7 +98,8 @@ class OAKDPublisherNode:
 
     def _publish_tf(self, camToWorld, timestamp):
         tf_message = to_tf_message(camToWorld, timestamp, self.rgb_frame_id, self.world_frame_id)
-        self.tf_publisher.publish(tf_message)         
+        tf_message.transforms[0].header.stamp = timestamp
+        self.tf_publisher.publish(tf_message)       
     
     def _publish_depth(self, depth_image, timestamp, sequence_number):
         depth_msg = self.bridge.cv2_to_imgmsg(depth_image, encoding=self.depth_encoding)
@@ -107,9 +109,19 @@ class OAKDPublisherNode:
         self.depth_publisher.publish(depth_msg)
 
     def _publish_keyframe(self, camToWorld, timestamp, sequence_number):
-        msg = to_pose_message(camToWorld, self.world_frame_id)
-        msg.header.seq = sequence_number
-        msg.header.stamp = timestamp
+        msg = TransformStamped()
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = self.world_frame_id
+        msg.child_frame_id = self.rgb_frame_id
+        msg.transform.translation.x = camToWorld[0, 3]
+        msg.transform.translation.y = camToWorld[1, 3]
+        msg.transform.translation.z = camToWorld[2, 3]
+        R_CW = Rotation.from_matrix(camToWorld[0:3, 0:3])
+        q_cw = R_CW.as_quat()
+        msg.transform.rotation.x = q_cw[0]
+        msg.transform.rotation.y = q_cw[1]
+        msg.transform.rotation.z = q_cw[2]
+        msg.transform.rotation.w = q_cw[3]
         self.keyframe_publisher.publish(msg)
 
     def _publish_point_cloud(self, keyframe, camToWorld, timestamp):
@@ -117,7 +129,6 @@ class OAKDPublisherNode:
         pc = np.zeros((positions.shape[0], 6), dtype=np.float32)
         p_C = np.vstack((positions.T, np.ones((1, positions.shape[0])))).T
         pc[:, :3] = (camToWorld @ p_C[:, :, None])[:, :3, 0]
-
         msg = PointCloud2()
         msg.header.stamp = timestamp
         msg.header.frame_id = self.world_frame_id
@@ -159,6 +170,7 @@ class OAKDPublisherNode:
         self._publish_keyframe(camToWorld, timestamp, sequence_number)
         self._publish_depth(depth_image, timestamp, sequence_number)
         self._publish_point_cloud(keyframe, camToWorld, timestamp)
+        self._publish_tf(camToWorld, timestamp)
         
     ###########
     # GETTERS #
@@ -186,7 +198,7 @@ class OAKDPublisherNode:
         camera_pose = vio_output.getCameraPose(0)
         cam_to_world = camera_pose.getCameraToWorldMatrix()
         self._publish_odometry(cam_to_world)
-        self._publish_tf(cam_to_world, rospy.Time.now())
+        # self._publish_tf(cam_to_world, rospy.Time.now())
 
     def _mapping_callback(self, output):
         for frame_id in output.updatedKeyFrames:
